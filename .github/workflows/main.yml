@@ -26,8 +26,13 @@ jobs:
           export-method: ad-hoc
           configuration: Release
           output-path: output.ipa
-          p12-base64: ${{ secrets.P12_BASE64 }}
-          mobileprovision-base64: ${{ secrets.MOBILEPROVISION_BASE64 }}
+          
+          # DIRECT REPOSITORY FILE PATHS
+          p12-path: .github/certs/00008020-001234920188402E.p12
+          p12-password: '1' # Replace with '1' or your custom password if '1234' fails
+          mobileprovision-path: .github/certs/00008020-001234920188402E.mobileprovision
+          
+          # SECURE ENVIRONMENT STRINGS KEPT IN GITHUB SECRETS
           code-signing-identity: ${{ secrets.CODE_SIGNING_IDENTITY }}
           team-id: ${{ secrets.TEAM_ID }}
 
