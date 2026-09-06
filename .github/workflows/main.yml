@@ -18,21 +18,31 @@ jobs:
         with:
           xcode-version: 'latest-stable'
 
+      - name: Setup keychain
+        run: |
+          security create-keychain -p "" ios-build.keychain
+          security set-keychain-settings -lut 21600 ~/Library/Keychains/ios-build.keychain
+          security unlock-keychain -p "" ~/Library/Keychains/ios-build.keychain
+
+      - name: Import certificate
+        run: |
+          security import .github/certs/00008020-001234920188402E.p12 \
+            -k ~/Library/Keychains/ios-build.keychain \
+            -P "1" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+
       - name: Build and export IPA
-        uses: yukiarrr/ios-build-action@v1.13.0
+        uses: yukiarrr/ios-build-action@v1.12.0
         with:
           project-path: LiveContainer.xcodeproj
           scheme: LiveContainer
           export-method: ad-hoc
           configuration: Release
           output-path: output.ipa
-          
-          # DIRECT REPOSITORY FILE PATHS
           p12-path: .github/certs/00008020-001234920188402E.p12
-          p12-password: '1' # Replace with '1' or your custom password if '1234' fails
+          p12-password: '1'
           mobileprovision-path: .github/certs/00008020-001234920188402E.mobileprovision
-          
-          # SECURE ENVIRONMENT STRINGS KEPT IN GITHUB SECRETS
           code-signing-identity: ${{ secrets.CODE_SIGNING_IDENTITY }}
           team-id: ${{ secrets.TEAM_ID }}
 
