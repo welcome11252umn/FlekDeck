@@ -19,7 +19,7 @@ jobs:
           xcode-version: 'latest-stable'
 
       - name: Build and export IPA
-        uses: yukiarrr/ios-build-action@v1.12.0
+        uses: yukiarrr/ios-build-action@v1.13.0
         with:
           project-path: LiveContainer.xcodeproj
           scheme: LiveContainer
