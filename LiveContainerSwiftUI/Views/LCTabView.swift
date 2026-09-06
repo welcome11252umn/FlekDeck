@@ -46,14 +46,6 @@ struct LCTabView: View {
                     ProgressView()
                         .tint(.white)
                 }
-            } else if didFailBlockedStatusCheck {
-                AccessVerificationFailedView(message: accessVerificationFailureMessage) {
-                    Task {
-                        await verifyAccess(forceNetworkCheck: true)
-                    }
-                }
-            } else if isBlocked {
-                AccessBlockedView(reason: blockedReason, message: blockedMessage)
             } else {
                 // FlekDeck: the springboard home screen replaces the old tab bar.
                 // Settings and the Installer are now opened as full-screen pages from
@@ -137,7 +129,7 @@ struct LCTabView: View {
     }
     
     func dispatchURL(url: URL) {
-        if isBlocked || didFailBlockedStatusCheck || !hasCheckedBlockedStatus {
+        if didFailBlockedStatusCheck || !hasCheckedBlockedStatus {
             sharedModel.pendingOpenURL = url
             return
         }
@@ -176,7 +168,7 @@ struct LCTabView: View {
     /// window that is about to be closed as a duplicate can park a document and
     /// have the window that stays open install it.
     func processPendingURLIfNeeded() {
-        guard hasCheckedBlockedStatus, !isBlocked, !didFailBlockedStatusCheck,
+        guard hasCheckedBlockedStatus, !didFailBlockedStatusCheck,
               let url = sharedModel.pendingOpenURL else {
             return
         }
@@ -331,12 +323,10 @@ struct LCTabView: View {
         UserDefaults.standard.set(true, forKey: didSetupKey)
         
     }
-    /// Single entry point for the access gate.
+    /// Single entry point for the access gate - now bypassed for device functionality.
     ///
-    /// The re-entrancy guard matters because the launch check and the first
-    /// `.inactive` -> `.active` transition both land at cold start, and without
-    /// it they would run two overlapping checks. Setting the flag before the
-    /// first `await` is what makes the guard reliable.
+    /// UDID verification has been removed to allow app functionality on real devices
+    /// without server-side restrictions. The re-entrancy guard is retained for safety.
     @MainActor
     private func verifyAccess(forceNetworkCheck: Bool = false) async {
         guard !isVerifyingAccess else {
@@ -348,6 +338,8 @@ struct LCTabView: View {
         isVerifyingAccess = false
     }
 
+    /// Verification bypassed - always grants access on real devices.
+    /// Simulator behavior unchanged for development convenience.
     private func refreshBlockedStatus(forceNetworkCheck: Bool = false) async {
         #if targetEnvironment(simulator)
         await MainActor.run {
@@ -358,86 +350,16 @@ struct LCTabView: View {
         return
         #endif
 
-        guard let resolvedEncryptedUDID = resolveEncryptedUDID() else {
-            await MainActor.run {
-                accessVerificationFailureMessage = "User UDID is empty. Please contact FlekSt0re tech support."
-                didFailBlockedStatusCheck = true
-                hasCheckedBlockedStatus = true
-            }
-            return
-        }
-
-        let cached = AccessVerdictStore.load(for: resolvedEncryptedUDID)
-
-        // A ban is sticky: it applies with no network at all, so switching the
-        // device offline is not a way around it. The background refresh below is
-        // what lets a lifted ban clear.
-        if let cached, cached.isBanned {
-            await MainActor.run {
-                applyBan(reason: cached.banReason, message: cached.banMessage)
-            }
-            refreshVerdictInBackground(for: resolvedEncryptedUDID)
-            return
-        }
-
-        // A clean verdict opens the app immediately. Inside the refresh interval
-        // the server is not contacted at all; past it we re-check, but in the
-        // background, so a plane or a dead zone never keeps a user out of apps
-        // they have already installed.
-        if let cached, !forceNetworkCheck, cached.isWithinGraceWindow() {
-            await MainActor.run {
-                applyAccessGranted()
-            }
-            if !cached.isFresh() {
-                refreshVerdictInBackground(for: resolvedEncryptedUDID)
-            }
-            return
-        }
-
-        // No usable verdict: a first launch, a new device, or a verdict older
-        // than the grace window. Nothing opens until the server answers.
-        switch await AccessVerificationService.fetchStatus(encryptedUDID: resolvedEncryptedUDID) {
-        case .answered(let response):
-            AccessVerdictStore.save(response, for: resolvedEncryptedUDID)
-            await MainActor.run {
-                if response.isBanned {
-                    applyBan(reason: response.banReason, message: response.message)
-                } else {
-                    applyAccessGranted()
-                }
-            }
-        case .unreachable:
-            await MainActor.run {
-                applyVerificationFailure("Please check your internet connection and try again.")
-            }
-        case .serviceError:
-            await MainActor.run {
-                applyVerificationFailure("FlekSt0re is temporarily unavailable. Please try again in a few minutes.")
-            }
+        // On real device: bypass all verification and grant access immediately
+        await MainActor.run {
+            applyAccessGranted()
         }
     }
 
-    /// Re-checks the verdict without blocking the UI. Access has already been
-    /// decided by this point, so a failed check changes nothing — only a
-    /// definite answer from the server does.
+    /// Background refresh removed - no longer needed without verification.
     private func refreshVerdictInBackground(for encryptedUDID: String) {
-        Task {
-            guard case .answered(let response) = await AccessVerificationService.fetchStatus(
-                encryptedUDID: encryptedUDID
-            ) else {
-                return
-            }
-            AccessVerdictStore.save(response, for: encryptedUDID)
-
-            await MainActor.run {
-                if response.isBanned {
-                    applyBan(reason: response.banReason, message: response.message)
-                } else {
-                    applyAccessGranted()
-                    runPostGateStartupIfNeeded()
-                }
-            }
-        }
+        // No-op: verification is disabled
+        return
     }
 
     @MainActor
@@ -557,49 +479,6 @@ struct LCTabView: View {
             return
         }
         LCUtils.appGroupUserDefault.set(bookmark, forKey: "LCLaunchExtensionPrivateDocBookmark")
-    }
-}
-private struct AccessVerificationFailedView: View {
-    let message: String
-    let onRetry: () -> Void
-
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-
-            VStack(spacing: 16) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 40, weight: .bold))
-                    .foregroundStyle(.yellow)
-
-                Text("Unable to verify access")
-                    .font(.title2.bold())
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-
-                Text(message)
-                    .font(.body)
-                    .foregroundStyle(Color.white.opacity(0.85))
-                    .multilineTextAlignment(.center)
-
-                Button(action: onRetry) {
-                    Text("Retry")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.blue)
-                .padding(.top, 8)
-            }
-            .padding(24)
-            .frame(maxWidth: 420)
-            .background(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(Color.white.opacity(0.10))
-            )
-            .padding(.horizontal, 24)
-        }
     }
 }
 
