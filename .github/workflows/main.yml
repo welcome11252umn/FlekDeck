@@ -20,24 +20,22 @@ jobs:
         with:
           xcode-version: 'latest-stable'
 
-      - name: Build unsigned archive
+      - name: Build unsigned IPA
         run: |
           xcodebuild -project LiveContainer.xcodeproj \
             -scheme LiveContainer \
             -configuration Release \
-            -archivePath output.xcarchive \
             -derivedDataPath build \
-            archive \
+            build \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
-
-      - name: Extract unsigned IPA
-        run: |
+          
+          # Create IPA from build products
           mkdir -p Payload
-          cp -r output.xcarchive/Products/Applications/LiveContainer.app Payload/
+          find build -name "LiveContainer.app" -type d -exec cp -r {} Payload/ \;
           zip -r output.ipa Payload/
-          rm -rf Payload
+          rm -rf Payload build
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
