@@ -98,7 +98,7 @@ Apps running inside a container may not be isolated from one another in the same
 
 ## Credits
 
-FlekDeck is developed and maintained by [FlekStore](https://flekstore.com).
+FlekDeck is developed and maintained by [FlekStore](https://flekstore.com). This is an unofficial fork of the app. All credits go to the developers of LiveContainer and FlekDeck (FlekStore).
 
 FlekDeck is based on the open-source [LiveContainer project](https://github.com/LiveContainer/LiveContainer). We are grateful to the LiveContainer maintainers and contributors whose work made FlekDeck possible.
 
