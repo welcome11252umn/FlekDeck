@@ -33,11 +33,11 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO
           
-          # Find the app
-          APP_PATH=$(find build -name "LiveContainer.app" -type d | head -1)
+          # Find the app - check for any .app bundle
+          APP_PATH=$(find build -name "*.app" -type d | head -1)
           
           if [ -z "$APP_PATH" ]; then
-            echo "Error: LiveContainer.app not found"
+            echo "Error: No .app bundle found"
             find build -type d -name "*.app"
             exit 1
           fi
@@ -46,7 +46,7 @@ jobs:
           
           # Create proper IPA structure
           mkdir -p Payload
-          cp -r "$APP_PATH" Payload/LiveContainer.app
+          cp -r "$APP_PATH" Payload/
           zip -r output.ipa Payload
           rm -rf Payload
 
