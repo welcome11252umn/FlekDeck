@@ -17,6 +17,9 @@ Built on [LiveContainer](https://github.com/LiveContainer/LiveContainer) and rei
 > [!NOTE]
 > FlekDeck runs apps inside its own environment. It is an app launcher, not an emulator or a virtual machine.
 
+> [!NOTE]
+> This is a modified build of FlekDeck which builds an unsigned .ipa file. GitHub Copilot was used to modify the code and make it buildable without code signing. This is not an official build of FlekDeck but it contains no code modifications to the app, only to the main.yml file, which allows an unsigned .ipa file to be produced.
+
 ## Highlights
 
 ### A brand-new Home Screen
